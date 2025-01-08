@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>貸款計算器</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .calculator {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .title {
+            text-align: center;
+            margin-bottom: 24px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #2563eb;
+        }
+
+        .error {
+            color: #dc2626;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 16px;
+            background-color: #f8fafc;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .result-label {
+            color: #666;
+        }
+
+        .result-value {
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h1 class="title">貸款計算器</h1>
+        
+        <div class="form-group">
+            <label for="principal">貸款金額</label>
+            <input type="number" id="principal" placeholder="請輸入貸款金額">
+        </div>
+
+        <div class="form-group">
+            <label for="rate">年利率 (%)</label>
+            <input type="number" id="rate" step="0.1" placeholder="請輸入年利率">
+        </div>
+
+        <div class="form-group">
+            <label for="years">貸款年限</label>
+            <input type="number" id="years" placeholder="請輸入貸款年限">
+        </div>
+
+        <div class="switch-container">
+            <input type="checkbox" id="hasGracePeriod">
+            <label for="hasGracePeriod">設定寬限期</label>
+        </div>
+
+        <div class="form-group" id="gracePeriodGroup" style="display: none;">
+            <label for="gracePeriod">寬限期（月）</label>
+            <input type="number" id="gracePeriod" placeholder="請輸入寬限期月數">
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <button onclick="calculateLoan()">計算</button>
+
+        <div class="result" id="result">
+            <h3>計算結果</h3>
+            <div id="graceResults" style="display: none;">
+                <div class="result-row">
+                    <span class="result-label">寬限期每月利息：</span>
+                    <span class="result-value" id="monthlyInterest"></span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">寬限期後每月還款：</span>
+                    <span class="result-value" id="monthlyPaymentAfterGrace"></span>
+                </div>
+            </div>
+            <div id="normalResults">
+                <div class="result-row">
+                    <span class="result-label">每月還款：</span>
+                    <span class="result-value" id="monthlyPayment"></span>
+                </div>
+            </div>
+            <div class="result-row">
+                <span class="result-label">總還款金額：</span>
+                <span class="result-value" id="totalPayment"></span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">利息總額：</span>
+                <span class="result-value" id="totalInterest"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 監聽寬限期開關
+        document.getElementById('hasGracePeriod').addEventListener('change', function(e) {
+            document.getElementById('gracePeriodGroup').style.display = e.target.checked ? 'block' : 'none';
+            if (!e.target.checked) {
+                document.getElementById('gracePeriod').value = '';
+            }
+        });
+
+        // 格式化金額
+        function formatCurrency(number) {
+            return new Intl.NumberFormat('zh-TW', {
+                style: 'currency',
+                currency: 'TWD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(number);
+        }
+
+        // 計算貸款
+        function calculateLoan() {
+            // 清除之前的錯誤
+            const errorElement = document.getElementById('error');
+            errorElement.textContent = '';
+            
+            // 獲取輸入值
+            const principal = parseFloat(document.getElementById('principal').value);
+            const annualRate = parseFloat(document.getElementById('rate').value);
+            const years = parseInt(document.getElementById('years').value);
+            const hasGracePeriod = document.getElementById('hasGracePeriod').checked;
+            const gracePeriod = hasGracePeriod ? parseInt(document.getElementById('gracePeriod').value) : 0;
+
+            // 驗證輸入
+            if (!principal || !annualRate || !years) {
+                errorElement.textContent = '請填寫所有必要欄位';
+                return;
+            }
+
+            if (hasGracePeriod && !gracePeriod) {
+                errorElement.textContent = '請填寫寬限期月數';
+                return;
+            }
+
+            if (principal <= 0 || annualRate < 0 || years <= 0 || gracePeriod < 0) {
+                errorElement.textContent = '請輸入有效的數值';
+                return;
+            }
+
+            if (gracePeriod >= years * 12) {
+                errorElement.textContent = '寬限期不能大於或等於總貸款期限';
+                return;
+            }
+
+            // 計算貸款
+            const monthlyRate = annualRate / 12 / 100;
+            const totalMonths = years * 12;
+            
+            // 寬限期內的利息支付
+            const monthlyInterestOnly = principal * monthlyRate;
+            const remainingMonths = totalMonths - gracePeriod;
+            
+            // 計算每月還款
+            let monthlyPayment;
+            if (monthlyRate === 0) {
+                monthlyPayment = principal / remainingMonths;
+            } else {
+                monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) 
+                               / (Math.pow(1 + monthlyRate, remainingMonths) - 1);
+            }
+
+            // 計算總還款金額
+            const totalPayment = (monthlyInterestOnly * gracePeriod) + (monthlyPayment * remainingMonths);
+            const totalInterest = totalPayment - principal;
+
+            // 顯示結果
+            document.getElementById('result').className = 'result show';
+            
+            if (hasGracePeriod) {
+                document.getElementById('graceResults').style.display = 'block';
+                document.getElementById('normalResults').style.display = 'none';
+                document.getElementById('monthlyInterest').textContent = formatCurrency(monthlyInterestOnly);
+                document.getElementById('monthlyPaymentAfterGrace').textContent = formatCurrency(monthlyPayment);
+            } else {
+                document.getElementById('graceResults').style.display = 'none';
+                document.getElementById('normalResults').style.display = 'block';
+                document.getElementById('monthlyPayment').textContent = formatCurrency(monthlyPayment);
+            }
+            
+            document.getElementById('totalPayment').textContent = formatCurrency(totalPayment);
+            document.getElementById('totalInterest').textContent = formatCurrency(totalInterest);
+        }
+    </script>
+</body>
+</html>
